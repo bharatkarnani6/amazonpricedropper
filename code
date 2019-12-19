@@ -1,0 +1,139 @@
+from tkinter import * 
+from PIL import ImageTk,Image
+from tkinter import messagebox
+import pymysql
+import requests
+from bs4 import BeautifulSoup
+import smtplib,ssl
+import socket
+global actual_price
+class amazon:
+    def __init__(self,root):
+        self.root=root
+        self.root.title("Amazon Price Dropper")
+        self.root.geometry("500x500")
+
+        self.fname=StringVar()
+        self.urlname=StringVar()
+        self.pricename=IntVar()
+        self.markset=IntVar()
+        self.emailname=StringVar()
+        
+
+        self.title=Label(self.root,text="Amazon Price Dropper",font=("",30,"bold"),bg="yellow",fg="blue",relief=GROOVE,bd=5)
+        self.title.place(x=0,y=0,relwidth=1)
+
+        self.full_label=Label(self.root,text="Full Name",font=("",15,"bold"))
+        self.full_label.place(x=70,y=100)
+
+        self.url_label=Label(self.root,text="URL",font=("",15,"bold"))
+        self.url_label.place(x=70,y=140)
+
+        self.price_label=Label(self.root,text="Price",font=("",15,"bold"))
+        self.price_label.place(x=70,y=180)
+
+        self.markset_label=Label(self.root,text="Set Price",font=("",15,"bold"))
+        self.markset_label.place(x=70,y=220)
+
+        self.email_label=Label(self.root,text="E-Mail",font=("",15,"bold"))
+        self.email_label.place(x=70,y=260)
+
+        self.full_entry=Entry(self.root,textvariable=self.fname,width=25,bd=5,relief=GROOVE)
+        self.full_entry.place(x=190,y=100)
+
+        self.url_entry=Entry(self.root,textvariable=self.urlname,width=25,bd=5,relief=GROOVE)
+        self.url_entry.place(x=190,y=140)
+
+        self.price_entry=Entry(self.root,textvariable=self.pricename,width=25,bd=5,relief=GROOVE)
+        self.price_entry.place(x=190,y=180)
+
+        self.markset_entry=Entry(self.root,textvariable=self.markset,width=25,bd=5,relief=GROOVE)
+        self.markset_entry.place(x=190,y=220)
+
+        self.email_entry=Entry(self.root,textvariable=self.emailname,width=25,bd=5,relief=GROOVE)
+        self.email_entry.place(x=190,y=260)
+
+        self.get_btn=Button(self.root,text="Get Mail",font=("",15,"bold"),bd=5,relief=GROOVE,command=self.getemail)
+        self.get_btn.place(x=130,y=320)
+
+        self.save_btn=Button(self.root,text="Save Data",font=("",15,"bold"),bd=5,relief=GROOVE,command=self.savedata)
+        self.save_btn.place(x=255,y=320)
+
+        self.exit_btn=Button(self.root,text="Exit",font=("",15,"bold"),bd=5,relief=GROOVE,command=self.exit)
+        self.exit_btn.place(x=210,y=370)
+
+        self.go_btn=Button(self.root,text="Go",font=("",10,"bold"),bd=3,relief=GROOVE,command=self.godata)
+        self.go_btn.place(x=370,y=140)
+
+    def exit(self):
+        self.root.destroy()
+
+    def savedata(self):
+        con=pymysql.connect(host="localhost",user="root",password="",database="amazon")
+        cur=con.cursor()
+        cur.execute("insert into url_list values(%s,%s,%s,%s,%s)",(self.fname.get(), self.urlname.get(), self.pricename.get(),self.markset.get(), self.emailname.get()))
+        con.commit()
+        con.close()
+    
+    def godata(self):
+        global converted_price
+        url=self.urlname.get()
+        header={"user-agent":'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36'}
+
+        page=requests.get(url,headers=header)
+        soup=  BeautifulSoup(page.content,'html.parser')
+        title=soup.find(id="productTitle").get_text()
+        print(title.strip())
+        if soup.find(id="priceblock_ourprice").get_text():
+            price=soup.find(id="priceblock_ourprice").get_text()
+            prices=len(price)-3
+            converted_price=price[2:prices]
+        elif soup.find(id="priceblock_dealprice").get_text():
+            price=soup.find(id="priceblock_dealprice").get_text()
+            prices=len(price)-3
+            converted_price=price[2:prices]
+        elif soup.find(id="priceblock_saleprice").get_text():
+            price=soup.find(id="priceblock_saleprice").get_text()
+            prices=len(price)-3
+            converted_price=price[2:prices]
+        else:
+            print("Error")
+        bad_chars=[',']
+        for i in bad_chars:
+            converted_price=converted_price.replace(i,'')
+        converted_price=int(converted_price)
+        
+        #print(type(converted_price))
+        self.price_entry.delete(0,END)
+        self.price_entry.insert(0,converted_price)
+
+    def getemail(self):
+        server=smtplib.SMTP('smtp.gmail.com',587)
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login('bharat.karnani6@gmail.com','maheswari')
+        subject="We Will Seek"
+        body="When Ever price will fall we will let you know "
+        msg=f"Subject:{subject}\n\n{body}"
+        server.sendmail('bharat.karnani6@gmail.com',self.emailname.get(),msg)
+        print("Done")
+        server.quit()
+        
+        if(self.markset.get()>=converted_price):
+            server=smtplib.SMTP('smtp.gmail.com',587)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login('bharat.karnani6@gmail.com','maheswari')
+            subject="Price Fall Down"
+            body="Check the url "+str(self.urlname.get())
+            msg=f"Subject:{subject}\n\n{body}"
+            server.sendmail('bharat.karnani6@gmail.com',self.emailname.get(),msg)
+            print("Done")
+            server.quit()
+
+root=Tk()
+obj=amazon(root)
+root.mainloop()
+
